@@ -1,29 +1,61 @@
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('Sensor Availability'),
+//       ),
+//       body: SingleChildScrollView(
+//         child: Center(
+//           child: FutureBuilder<bool>(
+//             future: _sensorService.isAccelerometerAvailable(),
+//             builder: (context, snapshot) {
+//               if (snapshot.connectionState == ConnectionState.waiting) {
+//                 return const CircularProgressIndicator();
+//               } else if (snapshot.hasError) {
+//                 return Text('Error: ${snapshot.error}');
+//               } else {
+//                 return Column(
+//                   mainAxisAlignment: MainAxisAlignment.center,
+//                   children: [
+//                     Text(snapshot.data == true
+//                         ? 'Accelerometer is available'
+//                         : 'Accelerometer is not available'),
+//                     const SizedBox(height: 20),
+//                     ElevatedButton(
+//                       onPressed: () {
+//                         _sensorService.startMovementDetection();
+//                       },
+//                       child: const Text('Start Movement Detection'),
+//                     ),
+//                     const SizedBox(height: 20),
+//                     ElevatedButton(
+//                       onPressed: () {
+//                         _sensorService.stopMovementDetection();
+//                       },
+//                       child: const Text('Stop Movement Detection'),
+//                     ),
+//
+//                   ],
+//                 );
+//               }
+//             },
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: MyHomePage(),
-    );
-  }
-}
 
 class SensorService {
   static const MethodChannel _channel =
       MethodChannel('com.example.movement_detection/sensor');
+  static Function(double x, double y, double z, bool isMoving)?
+      onMovementDetected;
 
   Future<bool> isAccelerometerAvailable() async {
     try {
@@ -31,7 +63,7 @@ class SensorService {
           await _channel.invokeMethod('isAccelerometerAvailable');
       return isAvailable;
     } on PlatformException catch (e) {
-      print("Failed to get accelerometer availability: '${e.message}'.");
+      log("Failed to get accelerometer availability: '${e.message}'.");
       return false;
     }
   }
@@ -45,12 +77,13 @@ class SensorService {
           final double x = data['x'];
           final double y = data['y'];
           final double z = data['z'];
-          // Handle movement data
-          print('Movement detected: x=$x, y=$y, z=$z');
+          onMovementDetected?.call(x, y, z, true);
+        } else if (call.method == 'onStationaryDetected') {
+          onMovementDetected?.call(0, 0, 0, false);
         }
       });
     } on PlatformException catch (e) {
-      print("Failed to start movement detection: '${e.message}'.");
+      log("Failed to start movement detection: '${e.message}'.");
     }
   }
 
@@ -58,53 +91,98 @@ class SensorService {
     try {
       await _channel.invokeMethod('stopMovementDetection');
     } on PlatformException catch (e) {
-      print("Failed to stop movement detection: '${e.message}'.");
+      log("Failed to stop movement detection: '${e.message}'.");
     }
   }
 }
 
-class MyHomePage extends StatelessWidget {
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: MovementDetectionPage(),
+    );
+  }
+}
+
+class MovementDetectionPage extends StatefulWidget {
+  const MovementDetectionPage({super.key});
+
+  @override
+  MovementDetectionPageState createState() => MovementDetectionPageState();
+}
+
+class MovementDetectionPageState extends State<MovementDetectionPage> {
+  static const eventChannel =
+      EventChannel('com.example.movement_detection/sensorStream');
   final SensorService _sensorService = SensorService();
+
+  String status = "Stationary";
+  double x = 0.0, y = 0.0, z = 0.0;
+  String isSensorAvailble = 'No data';
+
+  @override
+  void initState() {
+    super.initState();
+    eventChannel.receiveBroadcastStream().listen((event) {
+      setState(() {
+        x = event['x'];
+        y = event['y'];
+        z = event['z'];
+        status = event['status'];
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        isSensorAvailble = await _sensorService.isAccelerometerAvailable()
+            ? 'Accelerometer is available'
+            : 'Accelerometer is not available';
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Sensor Availability'),
+        title: const Text('Movement Detection'),
       ),
-      body: Center(
-        child: FutureBuilder<bool>(
-          future: _sensorService.isAccelerometerAvailable(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return CircularProgressIndicator();
-            } else if (snapshot.hasError) {
-              return Text('Error: ${snapshot.error}');
-            } else {
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(snapshot.data == true
-                      ? 'Accelerometer is available'
-                      : 'Accelerometer is not available'),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      _sensorService.startMovementDetection();
-                    },
-                    child: Text('Start Movement Detection'),
-                  ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      _sensorService.stopMovementDetection();
-                    },
-                    child: Text('Stop Movement Detection'),
-                  ),
-                ],
-              );
-            }
-          },
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(isSensorAvailble),
+              const SizedBox(height: 10),
+              // ElevatedButton(
+              //   onPressed: () {
+              //     _sensorService.startMovementDetection();
+              //   },
+              //   child: const Text('Start Movement Detection'),
+              // ),
+              // const SizedBox(height: 10),
+              // ElevatedButton(
+              //   onPressed: () {
+              //     _sensorService.stopMovementDetection();
+              //   },
+              //   child: const Text('Stop Movement Detection'),
+              // ),
+              Text('Status: $status',
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.bold)),
+              Text('X: ${x.toDouble().toStringAsFixed(1)}',
+                  style: const TextStyle(fontSize: 20)),
+              Text('Y: ${y.toDouble().toStringAsFixed(1)}',
+                  style: const TextStyle(fontSize: 20)),
+              Text('Z: ${z.toDouble().toStringAsFixed(1)}',
+                  style: const TextStyle(fontSize: 20)),
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ),
     );

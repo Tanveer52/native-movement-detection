@@ -8,10 +8,13 @@ import android.hardware.SensorManager
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.movement_detection/sensor"
+    private val EVENT_CHANNEL = "com.example.movement_detection/sensorStream"
+    
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
     private var accelerometerListener: SensorEventListener? = null
@@ -20,12 +23,14 @@ class MainActivity : FlutterActivity() {
     private var gravity = FloatArray(3) { 0f }
     private val stepSize = 0.2f // Step size for significant change detection
     private var lastValues = FloatArray(3) { 0f }
+    private var eventSink: EventChannel.EventSink? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
+        // Set up MethodChannel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "isAccelerometerAvailable" -> {
@@ -46,6 +51,20 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // Set up EventChannel
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    eventSink = events
+                    startMovementDetection()
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    stopMovementDetection()
+                }
+            }
+        )
     }
 
     private fun isAccelerometerAvailable(): Boolean {
@@ -65,12 +84,16 @@ class MainActivity : FlutterActivity() {
 
                     if (isSignificantMovement(x, y, z)) {
                         Log.d("MainActivity", "Significant movement detected - x: $x, y: $y, z: $z")
-
-                        // Process the movement data as needed
-                        // For example, you can send the data back to Flutter:
-                        MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL)
+                        
+                        // Send data through MethodChannel (if needed)
+                       MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL)
                             .invokeMethod("onMovementDetected", mapOf("x" to x, "y" to y, "z" to z))
+
+                        // Send data through EventChannel
+                        eventSink?.success(mapOf("x" to x, "y" to y, "z" to z, "status" to "Moving"))
                     } else {
+                        // Send data through EventChannel
+                        eventSink?.success(mapOf("x" to x, "y" to y, "z" to z, "status" to "Stationary"))
                         Log.d("MainActivity", "No significant movement")
                     }
                 }
@@ -90,6 +113,7 @@ class MainActivity : FlutterActivity() {
         } else {
             Log.d("MainActivity", "No accelerometer listener to unregister")
         }
+        eventSink = null
     }
 
     private fun lowPassFilter(input: FloatArray, output: FloatArray): FloatArray {
