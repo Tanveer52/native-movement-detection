@@ -6,8 +6,8 @@ import 'package:flutter/services.dart';
 class SensorService {
   static const MethodChannel _channel =
       MethodChannel('com.example.movement_detection/sensor');
-  static Function(double x, double y, double z, double distance,
-      double totalDistance, bool isMoving)? onMovementDetected;
+  static Function(double x, double y, double z, bool isMoving)?
+      onMovementDetected;
 
   Future<bool> isAccelerometerAvailable() async {
     try {
@@ -26,14 +26,12 @@ class SensorService {
       _channel.setMethodCallHandler((call) async {
         if (call.method == 'onMovementDetected') {
           final Map<String, dynamic> data = call.arguments;
-          final double x = data['x'];
-          final double y = data['y'];
-          final double z = data['z'];
-          final double distance = data['distance'];
-          final double totalDistance = data['totalDistance'];
-          onMovementDetected?.call(x, y, z, distance, totalDistance, true);
+          final double x = data['x'].toDouble(); // Ensuring double type
+          final double y = data['y'].toDouble(); // Ensuring double type
+          final double z = data['z'].toDouble(); // Ensuring double type
+          onMovementDetected?.call(x, y, z, true);
         } else if (call.method == 'onStationaryDetected') {
-          onMovementDetected?.call(0, 0, 0, 0, 0, false);
+          onMovementDetected?.call(0, 0, 0, false);
         }
       });
     } on PlatformException catch (e) {
@@ -77,39 +75,27 @@ class MovementDetectionPageState extends State<MovementDetectionPage> {
 
   String status = "Stationary";
   double x = 0.0, y = 0.0, z = 0.0;
-  double distance = 0.0, totalDistance = 0.0;
-  String isSensorAvailble = 'No data';
+  String isSensorAvailable = 'No data';
 
   @override
   void initState() {
     super.initState();
-    eventChannel.receiveBroadcastStream().listen((event) {
+    _sensorService.isAccelerometerAvailable().then((available) {
       setState(() {
-        x = event['x'];
-        y = event['y'];
-        z = event['z'];
-        status = event['status'];
-        distance = event['distance'];
-        totalDistance = event['totalDistance'];
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        isSensorAvailble = await _sensorService.isAccelerometerAvailable()
+        isSensorAvailable = available
             ? 'Accelerometer is available'
             : 'Accelerometer is not available';
       });
     });
 
-    SensorService.onMovementDetected = (double x, double y, double z,
-        double distance, double totalDistance, bool isMoving) {
+    eventChannel.receiveBroadcastStream().listen((event) {
       setState(() {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.distance = distance;
-        this.totalDistance = totalDistance;
-        status = isMoving ? "Moving" : "Stationary";
+        x = (event['x'] as num).toDouble(); // Ensuring double type
+        y = (event['y'] as num).toDouble(); // Ensuring double type
+        z = (event['z'] as num).toDouble(); // Ensuring double type
+        status = event['status'] as String;
       });
-    };
+    });
   }
 
   @override
@@ -125,22 +111,18 @@ class MovementDetectionPageState extends State<MovementDetectionPage> {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(isSensorAvailble),
+              Text(isSensorAvailable),
               const SizedBox(height: 10),
               Text('Status: $status',
                   style: const TextStyle(
                       fontSize: 24, fontWeight: FontWeight.bold)),
-              Text('X: ${x.toDouble().toStringAsFixed(1)}',
+              Text('X: ${x.toStringAsFixed(1)}',
                   style: const TextStyle(fontSize: 20)),
-              Text('Y: ${y.toDouble().toStringAsFixed(1)}',
+              Text('Y: ${y.toStringAsFixed(1)}',
                   style: const TextStyle(fontSize: 20)),
-              Text('Z: ${z.toDouble().toStringAsFixed(1)}',
+              Text('Z: ${z.toStringAsFixed(1)}',
                   style: const TextStyle(fontSize: 20)),
               const SizedBox(height: 10),
-              Text('Distance: ${distance.toStringAsFixed(2)} meters',
-                  style: const TextStyle(fontSize: 20)),
-              Text('Total Distance: ${totalDistance.toStringAsFixed(2)} meters',
-                  style: const TextStyle(fontSize: 20)),
             ],
           ),
         ),
