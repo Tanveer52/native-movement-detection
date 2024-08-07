@@ -6,8 +6,8 @@ import 'package:flutter/services.dart';
 class SensorService {
   static const MethodChannel _channel =
       MethodChannel('com.example.movement_detection/sensor');
-  static Function(double x, double y, double z, bool isMoving)?
-      onMovementDetected;
+  static Function(double x, double y, double z, double distance,
+      double totalDistance, bool isMoving)? onMovementDetected;
 
   Future<bool> isAccelerometerAvailable() async {
     try {
@@ -29,9 +29,11 @@ class SensorService {
           final double x = data['x'];
           final double y = data['y'];
           final double z = data['z'];
-          onMovementDetected?.call(x, y, z, true);
+          final double distance = data['distance'];
+          final double totalDistance = data['totalDistance'];
+          onMovementDetected?.call(x, y, z, distance, totalDistance, true);
         } else if (call.method == 'onStationaryDetected') {
-          onMovementDetected?.call(0, 0, 0, false);
+          onMovementDetected?.call(0, 0, 0, 0, 0, false);
         }
       });
     } on PlatformException catch (e) {
@@ -75,6 +77,7 @@ class MovementDetectionPageState extends State<MovementDetectionPage> {
 
   String status = "Stationary";
   double x = 0.0, y = 0.0, z = 0.0;
+  double distance = 0.0, totalDistance = 0.0;
   String isSensorAvailble = 'No data';
 
   @override
@@ -86,6 +89,8 @@ class MovementDetectionPageState extends State<MovementDetectionPage> {
         y = event['y'];
         z = event['z'];
         status = event['status'];
+        distance = event['distance'];
+        totalDistance = event['totalDistance'];
       });
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         isSensorAvailble = await _sensorService.isAccelerometerAvailable()
@@ -93,6 +98,18 @@ class MovementDetectionPageState extends State<MovementDetectionPage> {
             : 'Accelerometer is not available';
       });
     });
+
+    SensorService.onMovementDetected = (double x, double y, double z,
+        double distance, double totalDistance, bool isMoving) {
+      setState(() {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.distance = distance;
+        this.totalDistance = totalDistance;
+        status = isMoving ? "Moving" : "Stationary";
+      });
+    };
   }
 
   @override
@@ -110,19 +127,6 @@ class MovementDetectionPageState extends State<MovementDetectionPage> {
             children: [
               Text(isSensorAvailble),
               const SizedBox(height: 10),
-              // ElevatedButton(
-              //   onPressed: () {
-              //     _sensorService.startMovementDetection();
-              //   },
-              //   child: const Text('Start Movement Detection'),
-              // ),
-              // const SizedBox(height: 10),
-              // ElevatedButton(
-              //   onPressed: () {
-              //     _sensorService.stopMovementDetection();
-              //   },
-              //   child: const Text('Stop Movement Detection'),
-              // ),
               Text('Status: $status',
                   style: const TextStyle(
                       fontSize: 24, fontWeight: FontWeight.bold)),
@@ -133,6 +137,10 @@ class MovementDetectionPageState extends State<MovementDetectionPage> {
               Text('Z: ${z.toDouble().toStringAsFixed(1)}',
                   style: const TextStyle(fontSize: 20)),
               const SizedBox(height: 10),
+              Text('Distance: ${distance.toStringAsFixed(2)} meters',
+                  style: const TextStyle(fontSize: 20)),
+              Text('Total Distance: ${totalDistance.toStringAsFixed(2)} meters',
+                  style: const TextStyle(fontSize: 20)),
             ],
           ),
         ),

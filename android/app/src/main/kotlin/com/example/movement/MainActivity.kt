@@ -10,6 +10,8 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.movement_detection/sensor"
@@ -24,6 +26,10 @@ class MainActivity : FlutterActivity() {
     private val stepSize = 0.2f // Step size for significant change detection
     private var lastValues = FloatArray(3) { 0f }
     private var eventSink: EventChannel.EventSink? = null
+    private var totalDistance = 0.0
+    private var initialized = false
+
+    private val movementThreshold = 0.01 // Threshold for considering a change significant
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -82,19 +88,40 @@ class MainActivity : FlutterActivity() {
                     val y = filteredValues[1]
                     val z = filteredValues[2]
 
-                    if (isSignificantMovement(x, y, z)) {
-                        Log.d("MainActivity", "Significant movement detected - x: $x, y: $y, z: $z")
-                        
-                        // Send data through MethodChannel (if needed)
-                       MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL)
-                            .invokeMethod("onMovementDetected", mapOf("x" to x, "y" to y, "z" to z))
+                    if (!initialized) {
+                        lastValues[0] = x
+                        lastValues[1] = y
+                        lastValues[2] = z
+                        initialized = true
+                        return
+                    }
 
-                        // Send data through EventChannel
-                        eventSink?.success(mapOf("x" to x, "y" to y, "z" to z, "status" to "Moving"))
-                    } else {
-                        // Send data through EventChannel
-                        eventSink?.success(mapOf("x" to x, "y" to y, "z" to z, "status" to "Stationary"))
-                        Log.d("MainActivity", "No significant movement")
+                    val deltaX = Math.abs(x - lastValues[0])
+                    val deltaY = Math.abs(y - lastValues[1])
+                    val deltaZ = Math.abs(z - lastValues[2])
+
+                    if (deltaX > movementThreshold || deltaY > movementThreshold || deltaZ > movementThreshold) {
+                        val distance = calculateDistance(x, y, z, lastValues[0], lastValues[1], lastValues[2])
+                        if (distance >= 0.75) {
+                            totalDistance += distance
+                            Log.d("MainActivity", "Significant movement detected - x: $x, y: $y, z: $z, distance: $distance")
+
+                            // Send data through MethodChannel (if needed)
+                            MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL)
+                                .invokeMethod("onMovementDetected", mapOf("x" to x, "y" to y, "z" to z, "distance" to distance, "totalDistance" to totalDistance))
+
+                            // Send data through EventChannel
+                            eventSink?.success(mapOf("x" to x, "y" to y, "z" to z, "distance" to distance, "totalDistance" to totalDistance, "status" to "Moving"))
+
+                            // Update last values
+                            lastValues[0] = x
+                            lastValues[1] = y
+                            lastValues[2] = z
+                        } else {
+                            // Send data through EventChannel
+                            eventSink?.success(mapOf("x" to x, "y" to y, "z" to z, "distance" to distance, "totalDistance" to totalDistance, "status" to "Stationary"))
+                            Log.d("MainActivity", "No significant movement")
+                        }
                     }
                 }
             }
@@ -123,19 +150,7 @@ class MainActivity : FlutterActivity() {
         return output
     }
 
-    private fun isSignificantMovement(x: Float, y: Float, z: Float): Boolean {
-        val deltaX = Math.abs(x - lastValues[0])
-        val deltaY = Math.abs(y - lastValues[1])
-        val deltaZ = Math.abs(z - lastValues[2])
-
-        val isSignificant = deltaX > stepSize || deltaY > stepSize || deltaZ > stepSize
-
-        if (isSignificant) {
-            lastValues[0] = x
-            lastValues[1] = y
-            lastValues[2] = z
-        }
-
-        return isSignificant
+    private fun calculateDistance(x1: Float, y1: Float, z1: Float, x2: Float, y2: Float, z2: Float): Double {
+        return sqrt((x2 - x1).toDouble().pow(2) + (y2 - y1).toDouble().pow(2) + (z2 - z1).toDouble().pow(2))
     }
 }
