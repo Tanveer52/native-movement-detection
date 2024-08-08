@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.SystemClock
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -30,6 +31,9 @@ class MainActivity : FlutterActivity() {
     private var initialized = false
 
     private val movementThreshold = 0.5 // Adjusted threshold for considering a change significant
+
+    private val inactivityTimeout: Long = 2 * 60 * 1000 // 2 minutes in milliseconds
+    private var lastMovementTime: Long = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -93,6 +97,7 @@ class MainActivity : FlutterActivity() {
                         lastValues[1] = y
                         lastValues[2] = z
                         initialized = true
+                        lastMovementTime = SystemClock.elapsedRealtime()
                         return
                     }
 
@@ -100,6 +105,7 @@ class MainActivity : FlutterActivity() {
                     val deltaY = Math.abs(y - lastValues[1])
                     val deltaZ = Math.abs(z - lastValues[2])
 
+                    val currentTime = SystemClock.elapsedRealtime()
                     if (deltaX > movementThreshold || deltaY > movementThreshold || deltaZ > movementThreshold) {
                         val distance = calculateDistance(x, y, z, lastValues[0], lastValues[1], lastValues[2])
                         totalDistance += distance
@@ -116,15 +122,25 @@ class MainActivity : FlutterActivity() {
                         lastValues[0] = x
                         lastValues[1] = y
                         lastValues[2] = z
+
+                        // Update last movement time
+                        lastMovementTime = currentTime
                     } else {
                         // Send data through EventChannel
                         eventSink?.success(mapOf("x" to x, "y" to y, "z" to z, "distance" to 0, "totalDistance" to totalDistance, "status" to "Stationary"))
                         Log.d("MainActivity", "No significant movement")
+                        
+                        if (currentTime - lastMovementTime >= inactivityTimeout) {
+                            eventSink?.success(mapOf("status" to "User has not moved for 2 minutes"))
+                            Log.d("MainActivity", "User has not moved for 2 minutes")
+                            lastMovementTime = currentTime // Reset to prevent repeated messages
+                        }
                     }
                 }
             }
             sensorManager.registerListener(accelerometerListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL)
             Log.d("MainActivity", "Accelerometer listener registered")
+            lastMovementTime = SystemClock.elapsedRealtime() // Initialize the last movement time
         } else {
             Log.d("MainActivity", "Accelerometer not available or listener already registered")
         }

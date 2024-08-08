@@ -1,7 +1,6 @@
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final sensorServiceProvider =
@@ -36,11 +35,23 @@ class SensorServiceNotifier extends ChangeNotifier {
 
   void _listenToSensorStream() {
     _eventChannel.receiveBroadcastStream().listen((event) {
-      x = (event['x'] as num).toDouble();
-      y = (event['y'] as num).toDouble();
-      z = (event['z'] as num).toDouble();
-      status = event['status'] as String;
-      notifyListeners();
+      // Check if the event contains the new status
+      if (event['status'] == "User has not moved for 2 minutes") {
+        status = event['status'] as String;
+        notifyListeners();
+        return;
+      }
+
+      // Handle normal sensor data
+      try {
+        x = (event['x'] as num?)?.toDouble() ?? 0.0;
+        y = (event['y'] as num?)?.toDouble() ?? 0.0;
+        z = (event['z'] as num?)?.toDouble() ?? 0.0;
+        status = event['status'] as String;
+        notifyListeners();
+      } catch (e) {
+        log("Error parsing sensor event: $e");
+      }
     });
   }
 
