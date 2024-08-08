@@ -34,6 +34,7 @@ class MainActivity : FlutterActivity() {
 
     private val inactivityTimeout: Long = 2 * 60 * 1000 // 2 minutes in milliseconds
     private var lastMovementTime: Long = 0
+    private var alert: String = "" // Variable to store alert message
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -56,6 +57,10 @@ class MainActivity : FlutterActivity() {
                 "stopMovementDetection" -> {
                     Log.d("MainActivity", "stopMovementDetection called")
                     stopMovementDetection()
+                    result.success(null)
+                }
+                "resetAlert" -> {
+                    resetAlert()
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -125,14 +130,16 @@ class MainActivity : FlutterActivity() {
 
                         // Update last movement time
                         lastMovementTime = currentTime
+                        alert = "" // Reset alert if movement is detected
                     } else {
                         // Send data through EventChannel
                         eventSink?.success(mapOf("x" to x, "y" to y, "z" to z, "distance" to 0, "totalDistance" to totalDistance, "status" to "Stationary"))
                         Log.d("MainActivity", "No significant movement")
                         
                         if (currentTime - lastMovementTime >= inactivityTimeout) {
-                            eventSink?.success(mapOf("alert" to "User has not moved for 2 minutes"))
-                            Log.d("MainActivity", "User has not moved for 2 minutes")
+                            alert = "User has not moved for 2 minutes"
+                            eventSink?.success(mapOf("alert" to alert))
+                            Log.d("MainActivity", alert)
                             lastMovementTime = currentTime // Reset to prevent repeated messages
                         }
                     }
@@ -155,6 +162,11 @@ class MainActivity : FlutterActivity() {
             Log.d("MainActivity", "No accelerometer listener to unregister")
         }
         eventSink = null
+    }
+
+    private fun resetAlert() {
+        alert = ""
+        Log.d("MainActivity", "Alert reset")
     }
 
     private fun highPassFilter(input: FloatArray, output: FloatArray): FloatArray {

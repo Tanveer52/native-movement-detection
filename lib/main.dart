@@ -45,7 +45,7 @@ class MovementDetectionPage extends ConsumerWidget {
                       fontSize: 24, fontWeight: FontWeight.bold)),
               Text('Alert: ${sensorService.alert}',
                   style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.bold)),
+                      fontSize: 12, fontWeight: FontWeight.bold)),
               Text('X: ${sensorService.x.toStringAsFixed(1)}',
                   style: const TextStyle(fontSize: 20)),
               Text('Y: ${sensorService.y.toStringAsFixed(1)}',
@@ -68,7 +68,7 @@ class MovementDetectionPage extends ConsumerWidget {
                       padding: const EdgeInsetsDirectional.all(8),
                       child: const Center(
                         child: Text(
-                          'Start Detection',
+                          'Start',
                           style: TextStyle(
                             color: Colors.white,
                           ),
@@ -88,7 +88,27 @@ class MovementDetectionPage extends ConsumerWidget {
                       padding: const EdgeInsetsDirectional.all(8),
                       child: const Center(
                         child: Text(
-                          'Stop Detection',
+                          'Stop',
+                          style: TextStyle(
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      await sensorService.resetAlert();
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      padding: const EdgeInsetsDirectional.all(8),
+                      child: const Center(
+                        child: Text(
+                          'Rest Alert',
                           style: TextStyle(
                             color: Colors.white,
                           ),

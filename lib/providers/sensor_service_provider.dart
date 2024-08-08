@@ -38,6 +38,7 @@ class SensorServiceNotifier extends ChangeNotifier {
     _eventChannel.receiveBroadcastStream().listen((event) {
       // Check if the event contains the alert message
       if (event.containsKey('alert')) {
+        log('🅴🆅🅴🅽🆃 🅰🅻🅴🆁🆃 🅸🆂 : ${event['alert'] as String}');
         alert = event['alert'] as String;
         notifyListeners();
         return;
@@ -51,7 +52,7 @@ class SensorServiceNotifier extends ChangeNotifier {
         status = event['status'] as String;
         notifyListeners();
       } catch (e) {
-        log("Error parsing sensor event: $e");
+        log("Error processing sensor data: $e");
       }
     });
   }
@@ -71,6 +72,16 @@ class SensorServiceNotifier extends ChangeNotifier {
       _resetValues();
     } on PlatformException catch (e) {
       log("Failed to stop movement detection: '${e.message}'.");
+    }
+  }
+
+  Future<void> resetAlert() async {
+    try {
+      await _channel.invokeMethod('resetAlert');
+      alert = "";
+      notifyListeners();
+    } on PlatformException catch (e) {
+      log("Failed to reset alert: '${e.message}'.");
     }
   }
 
