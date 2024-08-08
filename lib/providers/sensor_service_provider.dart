@@ -15,6 +15,7 @@ class SensorServiceNotifier extends ChangeNotifier {
       EventChannel('com.example.movement_detection/sensorStream');
 
   String status = "Stationary";
+  String alert = "";
   double x = 0.0, y = 0.0, z = 0.0;
   bool isSensorAvailable = false;
 
@@ -35,9 +36,9 @@ class SensorServiceNotifier extends ChangeNotifier {
 
   void _listenToSensorStream() {
     _eventChannel.receiveBroadcastStream().listen((event) {
-      // Check if the event contains the new status
-      if (event['status'] == "User has not moved for 2 minutes") {
-        status = event['status'] as String;
+      // Check if the event contains the alert message
+      if (event.containsKey('alert')) {
+        alert = event['alert'] as String;
         notifyListeners();
         return;
       }
@@ -75,6 +76,7 @@ class SensorServiceNotifier extends ChangeNotifier {
 
   void _resetValues() {
     status = "Stationary";
+    alert = "";
     x = 0.0;
     y = 0.0;
     z = 0.0;

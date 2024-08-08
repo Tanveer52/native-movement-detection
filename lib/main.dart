@@ -43,6 +43,9 @@ class MovementDetectionPage extends ConsumerWidget {
               Text('Status: ${sensorService.status}',
                   style: const TextStyle(
                       fontSize: 24, fontWeight: FontWeight.bold)),
+              Text('Alert: ${sensorService.alert}',
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.bold)),
               Text('X: ${sensorService.x.toStringAsFixed(1)}',
                   style: const TextStyle(fontSize: 20)),
               Text('Y: ${sensorService.y.toStringAsFixed(1)}',

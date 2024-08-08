@@ -131,7 +131,7 @@ class MainActivity : FlutterActivity() {
                         Log.d("MainActivity", "No significant movement")
                         
                         if (currentTime - lastMovementTime >= inactivityTimeout) {
-                            eventSink?.success(mapOf("status" to "User has not moved for 2 minutes"))
+                            eventSink?.success(mapOf("alert" to "User has not moved for 2 minutes"))
                             Log.d("MainActivity", "User has not moved for 2 minutes")
                             lastMovementTime = currentTime // Reset to prevent repeated messages
                         }
